@@ -499,7 +499,7 @@
       autoPlayButton.textContent = "オートプレイ停止";
       autoPlayTimer = setInterval(() => {
         doDraw();
-      }, 50); // 連続抽選(50ms間隔)
+      }, 10); // 連続抽選(50ms間隔)
     }
     function stopAutoPlay() {
       autoPlaying = false;
