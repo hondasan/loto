@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ロト6 / ロト7 / ミニロト シミュレーター</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    /* リセット＆レイアウト */
+    html, body {
+      margin: 0; 
+      padding: 0;
+      box-sizing: border-box;
+    }
+    * {
+      box-sizing: inherit;
+    }
+    body {
+      font-family: sans-serif;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 1em;
+    }
+
+    h1, h2 {
+      margin: 0.5em 0;
+    }
+    button, select {
+      font-size: 1rem;
+      padding: 0.4em 0.8em;
+      margin: 0.3em 0;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    /* 数字ボタン配置エリア */
+    #numberButtonsContainer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-bottom: 1em;
+    }
+    .number-button {
+      width: 40px;
+      height: 40px;
+      line-height: 40px;
+      text-align: center;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #f5f5f5;
+      cursor: pointer;
+      user-select: none;
+    }
+    .number-button:hover {
+      background: #eee;
+    }
+    .selected {
+      background: #f66;
+      color: #fff;
+      font-weight: bold;
+    }
+
+    hr {
+      margin: 1em 0;
+    }
+
+    /* 抽選結果 */
+    #drawArea {
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 0.5em;
+      background: #fafafa;
+      margin-bottom: 1em;
+    }
+    .numbers-display {
+      margin: 0.3em 0;
+    }
+    .numbers-display span {
+      display: inline-block;
+      min-width: 2em;
+      text-align: center;
+      margin-right: 0.3em;
+      padding: 0.1em 0.3em;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #f5f5f5;
+    }
+
+    /* ログ表示 */
+    #logArea {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 0.5em;
+      background: #fff;
+      margin-bottom: 1em;
+    }
+    .hit-log {
+      color: #d9534f;
+      font-weight: bold;
+      margin: 0.2em 0;
+    }
+
+    /* 当選状況テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1em;
+    }
+    table th, table td {
+      border: 1px solid #ccc;
+      padding: 0.4em;
+      text-align: center;
+    }
+    tfoot td {
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>ロト6 / ロト7 / ミニロト シミュレーター</h1>
+
+  <!-- ゲーム種別選択 -->
+  <p>
+    <label for="gameTypeSelect">種類を選択:</label>
+    <select id="gameTypeSelect">
+      <option value="loto6">ロト6</option>
+      <option value="loto7">ロト7</option>
+      <option value="miniloto">ミニロト</option>
+    </select>
+  </p>
+
+  <!-- 数字ボタン配置エリア -->
+  <div id="numberButtonsContainer"></div>
+
+  <!-- ランダム選択ボタン -->
+  <button id="randomSelectButton">ランダム選択</button>
+  <!-- ゲーム開始ボタン -->
+  <button id="startButton">ゲーム開始</button>
+
+  <hr>
+
+  <!-- ゲームエリア -->
+  <div id="gameArea" class="hidden">
+    <p id="infoMessage"></p>
+    <div>
+      <button id="drawButton">抽選</button>
+      <button id="autoPlayButton">オートプレイ</button>
+    </div>
+    <p id="drawCountText">抽選回数: 0</p>
+
+    <!-- 抽選結果 -->
+    <div id="drawArea">
+      <p class="numbers-display">
+        <strong>抽選数字:</strong>
+        <span id="mainNumbersDisplay"></span>
+      </p>
+      <p class="numbers-display">
+        <strong>ボーナス:</strong>
+        <span id="bonusNumbersDisplay"></span>
+      </p>
+      <p>
+        <strong>結果:</strong>
+        <span id="prizeResultDisplay"></span>
+      </p>
+    </div>
+
+    <!-- 当選ログ -->
+    <h2>当選ログ</h2>
+    <div id="logArea"></div>
+
+    <!-- 当選状況テーブル -->
+    <h2>当選状況</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>等級</th>
+          <th>賞金</th>        <!-- 追加：賞金列 -->
+          <th>当選回数</th>
+          <th>確率</th>
+          <th>累計賞金</th>
+        </tr>
+      </thead>
+      <tbody id="statsTableBody">
+        <!-- ゲーム開始時に動的生成 -->
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="4">合計賞金</td>
+          <td id="totalPrizeCell">0</td>
+        </tr>
+        <tr>
+          <td colspan="4">使った金額</td>
+          <td id="usedMoneyCell">0</td>
+        </tr>
+        <tr>
+          <td colspan="4">収支</td>
+          <td id="netBalanceCell">0</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <script>
+    /* ===================================
+       1. 賞金・ルール定義
+       =================================== */
+    // (A) ロト6
+    // 1～43, pick6, main=6, bonus=1, 費用200円
+    // 1等:6/6, 2等:5+bonus, 3等:5, 4等:4, 5等:3
+    const LOTO6_RANKS = [
+      { name: "1等", prize: 100003400 },
+      { name: "2等", prize: 15000300  },
+      { name: "3等", prize: 500000    },
+      { name: "4等", prize: 9500       },
+      { name: "5等", prize: 1000      },
+    ];
+
+    // (B) ロト7
+    // 1～37, pick7, main=7, bonus=2, 費用300円
+    // 1等:7/7, 2等:6+bonus≥1, 3等:6, 4等:5, 5等:4, 6等:3+bonus≥1
+    const LOTO7_RANKS = [
+      { name: "1等", prize: 400000000 },
+      { name: "2等", prize: 10000200  },
+      { name: "3等", prize: 1000000    },
+      { name: "4等", prize: 12500     },
+      { name: "5等", prize: 2000      },
+      { name: "6等", prize: 1000       },
+    ];
+
+    // (C) ミニロト
+    // 1～31, pick5, main=5, bonus=1, 費用200円
+    // 1等:5/5, 2等:4+bonus, 3等:4, 4等:3
+    const MINILOTO_RANKS = [
+      { name: "1等", prize: 10046800 },
+      { name: "2等", prize: 144300   },
+      { name: "3等", prize: 10000    },
+      { name: "4等", prize: 1000     },
+    ];
+
+    // ゲーム種別ごとの設定
+    const gameSettings = {
+      loto6: {
+        name: "ロト6",
+        rangeMax: 43,
+        pickCount: 6,
+        mainDrawCount: 6,
+        bonusDrawCount: 1,
+        cost: 200,
+        ranks: LOTO6_RANKS,
+        checkPrize: checkLoto6
+      },
+      loto7: {
+        name: "ロト7",
+        rangeMax: 37,
+        pickCount: 7,
+        mainDrawCount: 7,
+        bonusDrawCount: 2,
+        cost: 300,
+        ranks: LOTO7_RANKS,
+        checkPrize: checkLoto7
+      },
+      miniloto: {
+        name: "ミニロト",
+        rangeMax: 31,
+        pickCount: 5,
+        mainDrawCount: 5,
+        bonusDrawCount: 1,
+        cost: 200,
+        ranks: MINILOTO_RANKS,
+        checkPrize: checkMiniLoto
+      }
+    };
+
+    /* ===================================
+       2. HTML要素取得
+       =================================== */
+    const gameTypeSelect        = document.getElementById('gameTypeSelect');
+    const numberButtonsContainer= document.getElementById('numberButtonsContainer');
+    const randomSelectButton    = document.getElementById('randomSelectButton');
+    const startButton           = document.getElementById('startButton');
+    const gameArea              = document.getElementById('gameArea');
+    const infoMessage           = document.getElementById('infoMessage');
+    const drawButton            = document.getElementById('drawButton');
+    const autoPlayButton        = document.getElementById('autoPlayButton');
+    const drawCountText         = document.getElementById('drawCountText');
+    const mainNumbersDisplay    = document.getElementById('mainNumbersDisplay');
+    const bonusNumbersDisplay   = document.getElementById('bonusNumbersDisplay');
+    const prizeResultDisplay    = document.getElementById('prizeResultDisplay');
+    const logArea               = document.getElementById('logArea');
+
+    const statsTableBody        = document.getElementById('statsTableBody');
+    const totalPrizeCell        = document.getElementById('totalPrizeCell');
+    const usedMoneyCell         = document.getElementById('usedMoneyCell');
+    const netBalanceCell        = document.getElementById('netBalanceCell');
+
+    /* ===================================
+       3. ゲーム状態
+       =================================== */
+    let currentGameMode = "loto6";  // 初期ロト6
+    let selectedNumbers = [];       // 選択された数字
+    let numberButtonEls = [];       // ボタン要素一覧(ランダム選択等で利用)
+    let drawCount       = 0;
+    let isGameActive    = false;
+    let autoPlaying     = false;
+    let autoPlayTimer   = null;
+
+    let currentRanks    = [];       // ゲーム開始時に複製して使用
+    let usedMoney       = 0;
+    let totalPrize      = 0;
+
+    /* ===================================
+       4. ゲーム種別切替 → ボタン再生成
+       =================================== */
+    gameTypeSelect.addEventListener('change', () => {
+      currentGameMode = gameTypeSelect.value;
+      setupNumberButtons();
+    });
+    document.addEventListener('DOMContentLoaded', () => {
+      setupNumberButtons();
+    });
+
+    function setupNumberButtons() {
+      const setting = gameSettings[currentGameMode];
+      selectedNumbers = [];
+      numberButtonEls = [];
+      numberButtonsContainer.innerHTML = "";
+
+      for (let i = 1; i <= setting.rangeMax; i++) {
+        const btn = document.createElement('div');
+        btn.classList.add('number-button');
+        btn.textContent = i;
+
+        // ボタンクリック時
+        btn.addEventListener('click', () => onNumberButtonClick(i, btn));
+        
+        numberButtonsContainer.appendChild(btn);
+        numberButtonEls.push(btn);
+      }
+    }
+    function onNumberButtonClick(num, btn) {
+      const setting = gameSettings[currentGameMode];
+      const idx = selectedNumbers.indexOf(num);
+      if (idx === -1) {
+        // 未選択 → 選択
+        if (selectedNumbers.length >= setting.pickCount) {
+          alert(`${setting.pickCount}個まで選べます。`);
+          return;
+        }
+        selectedNumbers.push(num);
+        btn.classList.add('selected');
+      } else {
+        // 選択済 → 解除
+        selectedNumbers.splice(idx, 1);
+        btn.classList.remove('selected');
+      }
+    }
+
+    /* ===================================
+       5. ランダム選択ボタン
+       =================================== */
+    randomSelectButton.addEventListener('click', () => {
+      const setting = gameSettings[currentGameMode];
+
+      // 全解除
+      selectedNumbers = [];
+      numberButtonEls.forEach(b => b.classList.remove('selected'));
+
+      // 1～rangeMax の配列を作ってシャッフル
+      const pool = [];
+      for (let i = 1; i <= setting.rangeMax; i++){
+        pool.push(i);
+      }
+      shuffleArray(pool);
+
+      // pickCount 個だけ選ぶ
+      const picks = pool.slice(0, setting.pickCount).sort((a,b)=>a-b);
+      selectedNumbers = picks;
+
+      // ボタンを選択状態に
+      // (picksは昇順にしてあるので buttonEls[picks[i]-1] で該当ボタン)
+      picks.forEach(num => {
+        numberButtonEls[num - 1].classList.add('selected');
+      });
+    });
+
+    /* ===================================
+       6. ゲーム開始
+       =================================== */
+    startButton.addEventListener('click', () => {
+      const setting = gameSettings[currentGameMode];
+      if (selectedNumbers.length !== setting.pickCount) {
+        alert(`${setting.pickCount}個の数字を選んでください。`);
+        return;
+      }
+
+      drawCount   = 0;
+      isGameActive= true;
+      stopAutoPlay();
+
+      // ranksのコピー
+      currentRanks = setting.ranks.map(r => ({
+        name: r.name,
+        prize: r.prize,
+        count: 0,
+        prizeTotal: 0
+      }));
+      usedMoney   = 0;
+      totalPrize  = 0;
+
+      // UI初期化
+      gameArea.classList.remove('hidden');
+      infoMessage.textContent = `【${setting.name}】選択数字: ${selectedNumbers.sort((a,b)=>a-b).join(', ')}`;
+      drawCountText.textContent = "抽選回数: 0";
+      mainNumbersDisplay.textContent = "";
+      bonusNumbersDisplay.textContent = "";
+      prizeResultDisplay.textContent = "";
+      logArea.innerHTML = "";
+
+      renderStatsTable();
+      updateStatsUI();
+    });
+
+    /* ===================================
+       7. 抽選処理
+       =================================== */
+    drawButton.addEventListener('click', () => {
+      if (!isGameActive) return;
+      doDraw();
+    });
+
+    function doDraw() {
+      const setting = gameSettings[currentGameMode];
+      drawCount++;
+      drawCountText.textContent = `抽選回数: ${drawCount}`;
+
+      // 費用加算
+      usedMoney += setting.cost;
+
+      // シャッフル → 先頭メイン抽選 / 続きでボーナス抽選
+      const pool = [];
+      for (let i=1; i<=setting.rangeMax; i++){
+        pool.push(i);
+      }
+      shuffleArray(pool);
+
+      const mainNums = pool.slice(0, setting.mainDrawCount).sort((a,b)=>a-b);
+      const bonusNums= pool.slice(setting.mainDrawCount, setting.mainDrawCount + setting.bonusDrawCount);
+
+      mainNumbersDisplay.textContent = mainNums.join(', ');
+      bonusNumbersDisplay.textContent= bonusNums.join(', ');
+
+      // 当選判定
+      const rankName = setting.checkPrize(selectedNumbers, mainNums, bonusNums);
+      if (rankName === "はずれ") {
+        prizeResultDisplay.textContent = "—";
+      } else {
+        prizeResultDisplay.textContent = rankName;
+
+        // ログ
+        const logItem = document.createElement('div');
+        logItem.classList.add('hit-log');
+        logItem.textContent =
+          `[${drawCount}回目] ${rankName} 当選! 本=[${mainNums.join(', ')}], ` +
+          `ボ=[${bonusNums.join(', ')}]`;
+        logArea.prepend(logItem);
+
+        // 集計
+        const rankObj = currentRanks.find(r => r.name === rankName);
+        if (rankObj) {
+          rankObj.count++;
+          rankObj.prizeTotal += rankObj.prize;
+          totalPrize += rankObj.prize;
+        }
+      }
+      updateStatsUI();
+    }
+
+    /* ===================================
+       8. オートプレイ
+       =================================== */
+    autoPlayButton.addEventListener('click', () => {
+      if (!isGameActive) return;
+      if (!autoPlaying) {
+        startAutoPlay();
+      } else {
+        stopAutoPlay();
+      }
+    });
+    function startAutoPlay() {
+      autoPlaying = true;
+      autoPlayButton.textContent = "オートプレイ停止";
+      autoPlayTimer = setInterval(() => {
+        doDraw();
+      }, 50); // 連続抽選(50ms間隔)
+    }
+    function stopAutoPlay() {
+      autoPlaying = false;
+      autoPlayButton.textContent = "オートプレイ";
+      if (autoPlayTimer) clearInterval(autoPlayTimer);
+      autoPlayTimer = null;
+    }
+
+    /* ===================================
+       9. 当選テーブル描画 & UI更新
+       =================================== */
+    function renderStatsTable() {
+      statsTableBody.innerHTML = "";
+      currentRanks.forEach(r => {
+        const tr = document.createElement('tr');
+
+        // 等級
+        const tdRank = document.createElement('td');
+        tdRank.textContent = r.name;
+        tr.appendChild(tdRank);
+
+        // 賞金
+        const tdPrizeOne = document.createElement('td');
+        tdPrizeOne.textContent = r.prize.toLocaleString();
+        tr.appendChild(tdPrizeOne);
+
+        // 当選回数
+        const tdCount = document.createElement('td');
+        tdCount.setAttribute('data-rank', r.name);
+        tdCount.setAttribute('data-field', 'count');
+        tr.appendChild(tdCount);
+
+        // 確率
+        const tdProb = document.createElement('td');
+        tdProb.setAttribute('data-rank', r.name);
+        tdProb.setAttribute('data-field', 'prob');
+        tr.appendChild(tdProb);
+
+        // 累計賞金
+        const tdPrizeTotal = document.createElement('td');
+        tdPrizeTotal.setAttribute('data-rank', r.name);
+        tdPrizeTotal.setAttribute('data-field', 'prizeTotal');
+        tr.appendChild(tdPrizeTotal);
+
+        statsTableBody.appendChild(tr);
+      });
+    }
+
+    function updateStatsUI() {
+      const dc = (drawCount === 0) ? 1 : drawCount; // 0回対策
+
+      currentRanks.forEach(r => {
+        const countTd  = statsTableBody.querySelector(`td[data-rank="${r.name}"][data-field="count"]`);
+        const probTd   = statsTableBody.querySelector(`td[data-rank="${r.name}"][data-field="prob"]`);
+        const totalTd  = statsTableBody.querySelector(`td[data-rank="${r.name}"][data-field="prizeTotal"]`);
+
+        if (countTd) {
+          countTd.textContent = r.count;
+        }
+        if (probTd) {
+          const percentage = ((r.count / dc) * 100).toFixed(4) + "%";
+          probTd.textContent = percentage;
+        }
+        if (totalTd) {
+          totalTd.textContent = r.prizeTotal.toLocaleString();
+        }
+      });
+
+      totalPrizeCell.textContent = totalPrize.toLocaleString();
+      usedMoneyCell.textContent  = usedMoney.toLocaleString();
+      netBalanceCell.textContent = (totalPrize - usedMoney).toLocaleString();
+    }
+
+    /* ===================================
+       10. 各ロトの当選判定
+       =================================== */
+    // ロト6 (公式ルール）
+    // 1等: main6
+    // 2等: main5 + bonus
+    // 3等: main5
+    // 4等: main4
+    // 5等: main3
+    function checkLoto6(myNums, mainNums, bonusNums) {
+      const matchMain = countMatches(myNums, mainNums);
+      const hasBonus  = myNums.includes(bonusNums[0]);
+
+      if (matchMain === 6) return "1等";
+      if (matchMain === 5 && hasBonus) return "2等";
+      if (matchMain === 5) return "3等";
+      if (matchMain === 4) return "4等";
+      if (matchMain === 3) return "5等";
+      return "はずれ";
+    }
+
+    // ロト7 (公式に近い)
+    // 1等: 7/7
+    // 2等: 6 + ボーナス>=1
+    // 3等: 6
+    // 4等: 5
+    // 5等: 4
+    // 6等: 3 + ボーナス>=1
+    function checkLoto7(myNums, mainNums, bonusNums) {
+      const matchM = countMatches(myNums, mainNums);
+      const matchB = countMatches(myNums, bonusNums);
+
+      if (matchM === 7) return "1等";
+      if (matchM === 6 && matchB >= 1) return "2等";
+      if (matchM === 6) return "3等";
+      if (matchM === 5) return "4等";
+      if (matchM === 4) return "5等";
+      if (matchM === 3 && matchB >= 1) return "6等";
+      return "はずれ";
+    }
+
+    // ミニロト (公式ルール)
+    // 1等: 5/5
+    // 2等: 4 + bonus
+    // 3等: 4
+    // 4等: 3
+    function checkMiniLoto(myNums, mainNums, bonusNums) {
+      const matchM = countMatches(myNums, mainNums);
+      const hasBonus = myNums.includes(bonusNums[0]);
+
+      if (matchM === 5) return "1等";
+      if (matchM === 4 && hasBonus) return "2等";
+      if (matchM === 4) return "3等";
+      if (matchM === 3) return "4等";
+      return "はずれ";
+    }
+
+    // n個一致を数える
+    function countMatches(myNums, drawNums) {
+      let c = 0;
+      for (let n of myNums) {
+        if (drawNums.includes(n)) c++;
+      }
+      return c;
+    }
+
+    // 配列シャッフル
+    function shuffleArray(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const r = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[r]] = [arr[r], arr[i]];
+      }
+    }
+  </script>
+</body>
+</html>
