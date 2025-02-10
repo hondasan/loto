@@ -127,6 +127,19 @@
 <body>
   <h1>ロト6 / ロト7 / ミニロト シミュレーター</h1>
 
+  <!-- ★★★ ここに広告を挿入 ★★★ -->
+  <div style="margin: 1em 0; text-align: center;">
+    <a href="//af.moshimo.com/af/c/click?a_id=4903800&p_id=752&pc_id=902&pl_id=9787" 
+       rel="nofollow" 
+       referrerpolicy="no-referrer-when-downgrade" 
+       attributionsrc>
+      <img src="//image.moshimo.com/af-img/0032/000000009787.gif" width="250" height="60" style="border:none;">
+    </a>
+    <img src="//i.moshimo.com/af/i/impression?a_id=4903800&p_id=752&pc_id=902&pl_id=9787" 
+         width="1" height="1" style="border:none;" loading="lazy">
+  </div>
+  <!-- ★★★ 広告ここまで ★★★ -->
+
   <!-- ゲーム種別選択 -->
   <p>
     <label for="gameTypeSelect">種類を選択:</label>
@@ -385,7 +398,6 @@
       selectedNumbers = picks;
 
       // ボタンを選択状態に
-      // (picksは昇順にしてあるので buttonEls[picks[i]-1] で該当ボタン)
       picks.forEach(num => {
         numberButtonEls[num - 1].classList.add('selected');
       });
@@ -499,7 +511,7 @@
       autoPlayButton.textContent = "オートプレイ停止";
       autoPlayTimer = setInterval(() => {
         doDraw();
-      }, 10); // 連続抽選(50ms間隔)
+      }, 10); // 連続抽選(10ms間隔)
     }
     function stopAutoPlay() {
       autoPlaying = false;
